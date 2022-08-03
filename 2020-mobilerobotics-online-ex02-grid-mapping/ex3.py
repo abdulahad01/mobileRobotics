@@ -69,10 +69,13 @@ def logodds2prob(lx):
     return prob
     
 def inv_sensor_model(cell, endpoint, prob_occ, prob_free):
+    # get cells occupied by line from sensor
     line = bresenham(cell[0],cell[1],endpoint[0],endpoint[1])
     prob_distr=[]
+    # append the cells from zero to 2nd last with unoccupied probability
     for i in range(len(line)-1):
         prob_distr.append(prob_free)
+    # The last cell where the measurement reaches is updated with occupied probability
     prob_distr.append(prob_occ)
     distr= np.array(prob_distr).reshape(len(line),1)
     inv_sensor_model = np.hstack((line, distr))  #stack grid cordinate and their probabilities
@@ -82,7 +85,8 @@ def grid_mapping_with_known_poses(ranges_raw, poses_raw, occ_gridmap, map_res, p
     occ_gridmap = prob2logodds(occ_gridmap)
     pose = poses2cells(poses_raw, occ_gridmap, map_res)
     for i in range (pose.shape[0]):
-        ranges = ranges2cells(ranges_raw[i] ,poses_raw[i], occ_gridmap, map_res).transpose()   #xy cordinates of cell that range passes thru for each robot pose i.e 352 reading per pose
+        #xy cordinates of cell that range passes thru for each robot pose 
+        ranges = ranges2cells(ranges_raw[i] ,poses_raw[i], occ_gridmap, map_res).transpose() 
         for j in range(ranges.shape[0]):
             inv_sens = inv_sensor_model(pose[i], ranges[j] , prob_occ, prob_free)
             for k in range(len(inv_sens)):
