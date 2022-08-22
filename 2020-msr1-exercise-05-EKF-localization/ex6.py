@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from math import atan2, sqrt,sin,cos
 import matplotlib.pyplot as plt
 import matplotlib.transforms as transforms
 import numpy as np
@@ -55,3 +56,43 @@ def wrapToPi(theta):
     while theta > np.pi:
         theta = theta - 2 * np.pi
     return theta
+
+def inverse_motion_model(u):
+    # print(u)
+    rot1 = atan2((u[1][1]-u[0][1]), (u[1][0]-u[0][0])) - u[0][2]
+    trans = sqrt(((u[1][0]-u[0][0])**2) + ((u[1][1]-u[0][1])**2))
+    rot2 = u[1][2] - u[0][2] - rot1
+    # print(rot1,trans,rot2)
+    return rot1,trans,rot2
+
+def ekf_predict(x_pred,P_pred,u):
+    for i in range(u.shape[0] - 1):
+        rot1,trans,rot2 = inverse_motion_model(u[i:i+2,:])
+        # predicted mean is the value of process model at linearization point
+        theta = x_pred[2][0]
+        G = np.array([[1, 0, -trans*(sin(theta +rot1))],
+                      [0, 1, trans*cos(theta+rot1)],
+                      [0, 0, 1]])
+        # print(G)
+        # V = np.array([[-trans*sin(theta+rot1), cos(theta+rot1), 0],
+        #              [trans*cos(theta+rot1), sin(theta+rot1), 0],
+        #              [1, 0, 1]])
+        x_pred = x_pred + np.array([[trans*cos(theta+rot1), trans*sin(theta+rot1), rot2+rot1]]).T
+        # covariance of prediction is GPG^T, where G is the jacobian of process at linearization point
+        P_pred = np.dot(np.dot(G,P_pred),G.T)
+    return x_pred,P_pred
+
+def ekf_correct(x,P,z):
+    # Calculate z_estimate from map readings and pos of robor
+
+    # Calculate y 
+
+    # Calculate S = HPH^T + R
+
+    # Calculate Kalman gain K = PH^TS^-1
+
+    # x_est = x-Ky
+
+    # P_est = (I-KP_est)P_est
+
+    return x_est,P_est
