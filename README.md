@@ -15,4 +15,8 @@ Assignments and related course material completed by me as part of the 'Online T
    ![Noisy sensor estimate](img/kf2.png?raw=true "Noisy sensor estimate")  
    ![Perfect sensor estimate](img/kf3.png?raw=true "Perfect sensor estimate")  
 
+6. **Extended Kalman filter based localization** Localization is the task of estimating the robots pose given the observations and Map information. Since most real world robot models use non linear models for motions, the common Kalman filter cannot be used. Instead we use the Extended Kalman Filter. In EKF we use first order taylor expansion to linearise the function (local linearization) and then perform the prediction and update steps similar to the Kalman Filter.  
+   In the given excercise the odometry and range measurements from a differential drive robot was given and the task was to localize the robot in a feature based map with known correspondence.    
+   ![Final Trajectory after EKF Localization](img/ekf.png?raw=true "Final Trajectory")   
+
 
