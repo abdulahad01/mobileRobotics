@@ -84,7 +84,7 @@ def ekf_predict(x_pred,P_pred,u,M = np.zeros(3)):
         P_pred = np.dot(np.dot(G,P_pred),G.T) + np.dot(np.dot(V,M),V.T) 
         return x_pred,P_pred
 
-def ekf_correct(x,P,z,map,Q=np.zeros(2)):
+def ekf_correct(x,P,z,map,Q):
     # Calculate z_estimate from map readings and pos of robot
     for i in range(z.shape[1]):
         theta = x[2][0]
@@ -114,7 +114,7 @@ def ekf_correct(x,P,z,map,Q=np.zeros(2)):
         # x_est = x-Ky
         x = x + np.dot(K,y)
         x[2][0] = wrapToPi(x[2][0])
-        # P_est = (I-KP_est)P_est
+        # P_est = P_est -KSK^T
         P = P - np.dot(K,np.dot(S,K.T))
 
     return x,P
