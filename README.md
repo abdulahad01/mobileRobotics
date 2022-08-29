@@ -19,4 +19,46 @@ Assignments and related course material completed by me as part of the 'Online T
    In the given excercise the odometry and range measurements from a differential drive robot was given and the task was to localize the robot in a feature based map with known correspondence.    
    ![Final Trajectory after EKF Localization](img/ekf.png?raw=true "Final Trajectory")   
 
+7. **Path planning** The path planning problem basically estimates a path from a given node to a goal node in a given mapped terrain. The path planning algorithms are of two types:  
+      1. Informed :  
+   In informed search the algorithm has some information about the cost to the goal node, usually in the form of heruristics.  
+   eg. A*, Greedy search etc.
+      2. Uninformed :  
+   In uninformed the algorithm doesnt have a heuristic usually estimates costs from origin node to current node.  
+   eg. Djikstra, BFS,DFS etc.  
+   
+   In the following assignment path planning was performed on an occupancy grid map using greedy search and A*. It was found that the computational speed can be significantly improved by applying a gaussian blur over the map provided.  
+   ![Greedy path planning](img/greedy.png?raw=true "greedy planner")
+
+   ```
+   A star algorithm
+
+   open = []
+   closed =[]
+   neighbors = []
+
+   while open:
+      open.sort()
+      current = open[0]
+      if current == goal:
+         return path
+         break
+      else:
+         closed.append(current)
+         for all valid neighbors of current:
+            if neighbor not in closed list:
+               new cost = cost to node + cost from node to goal
+               if neighbor in open:
+                  if cost > new cost:
+                     cost = new cost
+                     parent = current
+               else:
+                  open.append(neighbor)
+                  cost = new cost
+                  parent = current
+
+   ```
+   ![A* path planner](img/astar.png?raw=true "A* planner") 
+
+
 
