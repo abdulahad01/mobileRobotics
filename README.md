@@ -58,7 +58,19 @@ Assignments and related course material completed by me as part of the 'Online T
                   parent = current
 
    ```
-   ![A* path planner](img/astar.png?raw=true "A* planner") 
+   ![A* path planner](img/astar.png?raw=true "A* planner")  
 
+8. **Iterative Closest Point** : The point cloud data from Lidar or depth scans is not aligned. So for SLAM and other applications we need to match the cordinate frames of corresponding clouds. This can be done for both cases, known correspondeces and unknown correspondence between points.  
+   The algorithm for ICP is fairly straight forward.
+   ```
+   1. Define an initial guess
+   2. Initialize initial error to infinity
+   3. While Error is decreasing or Max iterations not reached 
+      3.1  Calcualte correspondences
+      3.2  Compute the Rotation and Translation vectors.
+      3.3 Calculate Error and New guess
+   ```
 
-
+   In the given assignment, KDtree algorithm was used to find correspondence between points.
+   ![Input](img/icp_input.png?raw=true "Input")   
+   ![Output](img/icp_output.png?raw=true "Output") 
