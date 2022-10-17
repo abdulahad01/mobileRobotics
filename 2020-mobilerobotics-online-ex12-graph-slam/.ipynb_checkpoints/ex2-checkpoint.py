@@ -206,7 +206,6 @@ def run_graph_slam(g, numIterations):
         # compute and print global error
 
         # terminate procedure if change is less than 10e-4
-        pass
 
 
 def compute_global_error(g):
@@ -240,10 +239,6 @@ def compute_global_error(g):
             info12 = edge.information
 
             # (TODO) compute the error due to this edge
-            Z = v2t(z)
-            X1_inverse = np.linalg.inv(v2t(x1))
-            X2 = v2t(x2)
-            Fx += t2v(np.linalg.inv(Z) @ (X1_inverse @ X2))
 
         # pose-pose constraint
         elif edge.Type == 'L':
@@ -261,12 +256,6 @@ def compute_global_error(g):
             info12 = edge.information
 
             # (TODO) compute the error due to this edge
-            Z = v2t(z)
-            X = v2t(x)
-            tran = X[:2,-1]
-            Rot = X[:2,:2]
-            Fx += np.linalg.inv(Z) @ np.linalg.inv(Rot) @ (l-tran)
-
 
     return Fx
 
@@ -313,12 +302,11 @@ def linearize_and_solve(g):
             e, A, B = linearize_pose_pose_constraint(x_i, x_j, edge.measurement)
 
             # (TODO) compute the terms
-            # b_i = 
-
-            # b_j = 
-            # H_ii = 
-            # H_ij = 
-            # H_jj = 
+            b_i = 
+            b_j = 
+            H_ii = 
+            H_ij = 
+            H_jj = 
 
             # (TODO) add the terms to H matrix and b
 
@@ -347,11 +335,11 @@ def linearize_and_solve(g):
 
 
             # (TODO) compute the terms
-            # b_i = 
-            # b_j = 
-            # H_ii = 
-            # H_ij = 
-            # H_jj = 
+            b_i = 
+            b_j = 
+            H_ii = 
+            H_ij = 
+            H_jj = 
 
             # (TODO )add the terms to H matrix and b
 
