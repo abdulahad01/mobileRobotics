@@ -1,3 +1,4 @@
+from math import atan2, sin, cos
 import numpy as np
 from collections import namedtuple
 import matplotlib.pyplot as plt
@@ -240,10 +241,10 @@ def compute_global_error(g):
             info12 = edge.information
 
             # (TODO) compute the error due to this edge
-            Z = v2t(z)
+            Z = v2t(z12)
             X1_inverse = np.linalg.inv(v2t(x1))
             X2 = v2t(x2)
-            Fx += t2v(np.linalg.inv(Z) @ (X1_inverse @ X2))
+            Fx += np.linalg.norm(t2v(np.linalg.inv(Z) @ (X1_inverse @ X2)))
 
         # pose-pose constraint
         elif edge.Type == 'L':
@@ -261,12 +262,8 @@ def compute_global_error(g):
             info12 = edge.information
 
             # (TODO) compute the error due to this edge
-            Z = v2t(z)
-            X = v2t(x)
-            tran = X[:2,-1]
-            Rot = X[:2,:2]
-            Fx += np.linalg.inv(Z) @ np.linalg.inv(Rot) @ (l-tran)
-
+            X = v2t(x)[:2,:2]
+            Fx += np.linalg.norm((np.linalg.inv(X) @ np.expand_dims(l,axis=1))  - np.expand_dims(z,axis=1))
 
     return Fx
 
@@ -384,6 +381,17 @@ def linearize_pose_pose_constraint(x1, x2, z):
          Jacobian wrt x2
     """
 
+    R_ij = v2t(z)[:2,:2]
+    t_ij = v2t(z)[:2,2]
+    R_i = v2t(x1)[:2,:2]
+    theta = atan2(R_i[1:0],R_i[1:1])
+    del_R_i = np.array([[-sin(theta),cos(theta)],[-cos(theta),-sin(theta)]])
+    t_i = v2t(x1)[:2,2]
+    t_j = v2t(x2)[:2,2]
+
+    A = np.array([[-(R_ij.T @ R_i.T), R_ij.T @ del_R_i @(t_j-t_i)],[0, -1]])
+    B = np.array([[R_ij.T@R_i.T, 0], [0, 1]])
+    e = np.array([R_ij.T@(R_i.T @ (t_j - t_i) -t_ij), theta_j-theta_i-theta_ij]).T
 
     return e, A, B
 
