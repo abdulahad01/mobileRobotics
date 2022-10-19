@@ -1,4 +1,5 @@
 from math import atan2, sin, cos
+import math
 from socket import fromfd
 import numpy as np
 from collections import namedtuple
@@ -195,20 +196,31 @@ def get_poses_landmarks(g):
 
 
 def run_graph_slam(g, numIterations):
+    tolerance = 1e-4
+    norm_dX_all = []
 
     # perform optimization
     for i in range(numIterations):
-
         # compute the incremental update dx of the state vector
+        dX = linearize_and_solve(g)
 
         # apply the solution to the state vector g.x
+        g.x = np.expand_dims(g.x, axis=1)
+        g.x += dX
 
         # plot graph
+        plot_graph(g)
 
         # compute and print global error
+        norm_dX = np.linalg.norm(dX)
+        print(f"|dX| for step {i} : {norm_dX}\n")
+        norm_dX_all.append(norm_dX)
 
         # terminate procedure if change is less than 10e-4
-        pass
+        if i >= 1 and np.abs(norm_dX_all[i] - norm_dX_all[i - 1]) < tolerance:
+            break
+
+    return
 
 
 def compute_global_error(g):
@@ -357,17 +369,16 @@ def linearize_and_solve(g):
                 x, l, edge.measurement)
 
             # (TODO) compute the terms
-            b_i = e.T @ edge.information @ A
+            b_i = (e.T @ edge.information @ A).reshape(3, 1)
 
-            b_j = e.T @ edge.information @ B
+            b_j = (e.T @ edge.information @ B).reshape(2, 1)
 
             H_ii = A.T @ edge.information @ A
             H_ij = A.T @ edge.information @ B
             H_ji = B.T @ edge.information @ A
             H_jj = B.T @ edge.information @ B
 
-            print(np.shape(H[fromIdx:fromIdx + 3,
-                  fromIdx:fromIdx + 3]), np.shape(H_ii))
+            # print(np.shape(b[fromIdx:fromIdx+3]), np.shape(b_i))
 
             # (TODO) add the terms to H matrix and b
             H[fromIdx:fromIdx + 3, fromIdx:fromIdx + 3] += H_ii
