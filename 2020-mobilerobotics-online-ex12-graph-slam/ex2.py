@@ -1,4 +1,5 @@
 from math import atan2, sin, cos
+from socket import fromfd
 import numpy as np
 from collections import namedtuple
 import matplotlib.pyplot as plt
@@ -15,16 +16,16 @@ class Graph:
 
 def read_graph_g2o(filename):
     """ This function reads the g2o text file as the graph class 
-    
+
     Parameters
     ----------
     filename : string
         path to the g2o file
-    
+
     Returns
     -------
     graph: Graph contaning information for SLAM 
-        
+
     """
     Edge = namedtuple(
         'Edge', ['Type', 'fromNode', 'toNode', 'measurement', 'information'])
@@ -91,12 +92,12 @@ def read_graph_g2o(filename):
 
 def v2t(pose):
     """This function converts SE2 pose from a vector to transformation  
-    
+
     Parameters
     ----------
     pose : 3x1 vector
         (x, y, theta) of the robot pose
-    
+
     Returns
     -------
     T : 3x3 matrix
@@ -110,12 +111,12 @@ def v2t(pose):
 
 def t2v(T):
     """This function converts SE2 transformation to vector for  
-    
+
     Parameters
     ----------
     T : 3x3 matrix
         Transformation matrix for 2D pose
-    
+
     Returns
     -------
     pose : 3x1 vector
@@ -199,11 +200,11 @@ def run_graph_slam(g, numIterations):
     for i in range(numIterations):
 
         # compute the incremental update dx of the state vector
-        
+
         # apply the solution to the state vector g.x
-        
+
         # plot graph
-        
+
         # compute and print global error
 
         # terminate procedure if change is less than 10e-4
@@ -212,11 +213,11 @@ def run_graph_slam(g, numIterations):
 
 def compute_global_error(g):
     """ This function computes the total error for the graph. 
-    
+
     Parameters
     ----------
     g : Graph class
-    
+
     Returns
     -------
     Fx: scalar
@@ -262,8 +263,9 @@ def compute_global_error(g):
             info12 = edge.information
 
             # (TODO) compute the error due to this edge
-            X = v2t(x)[:2,:2]
-            Fx += np.linalg.norm((np.linalg.inv(X) @ np.expand_dims(l,axis=1))  - np.expand_dims(z,axis=1))
+            X = v2t(x)[:2, :2]
+            Fx += np.linalg.norm((np.linalg.inv(X) @ np.expand_dims(l,
+                                 axis=1)) - np.expand_dims(z, axis=1))
 
     return Fx
 
@@ -275,7 +277,7 @@ def linearize_and_solve(g):
     Parameters
     ----------
     g : Graph class
-    
+
     Returns
     -------
     dx : Nx1 vector 
@@ -307,17 +309,28 @@ def linearize_and_solve(g):
             x_j = g.x[toIdx:toIdx + 3]
 
             # (TODO) compute the error and the Jacobians
-            e, A, B = linearize_pose_pose_constraint(x_i, x_j, edge.measurement)
+            e, A, B = linearize_pose_pose_constraint(
+                x_i, x_j, edge.measurement)
 
             # (TODO) compute the terms
-            # b_i = 
 
-            # b_j = 
-            # H_ii = 
-            # H_ij = 
-            # H_jj = 
+            b_i = e.T @ edge.information @ A
+
+            b_j = e.T @ edge.information @ B
+
+            H_ii = A.T @ edge.information @ A
+            H_ij = A.T @ edge.information @ B
+            H_ji = B.T @ edge.information @ A
+            H_jj = B.T @ edge.information @ B
 
             # (TODO) add the terms to H matrix and b
+            H[fromIdx:fromIdx + 3, fromIdx:fromIdx + 3] += H_ii
+            H[fromIdx:fromIdx + 3, toIdx:toIdx + 3] += H_ij
+            H[toIdx:toIdx + 3, fromIdx:fromIdx + 3] += H_ji
+            H[toIdx:toIdx + 3, toIdx:toIdx + 3] += H_jj
+
+            b[fromIdx:fromIdx+3] += b_i
+            b[toIdx:toIdx+3] += b_j
 
             # Add the prior for one pose of this edge
             # This fixes one node to remain at its current location
@@ -342,26 +355,34 @@ def linearize_and_solve(g):
             e, A, B = linearize_pose_landmark_constraint(
                 x, l, edge.measurement)
 
-
             # (TODO) compute the terms
-            # b_i = 
-            # b_j = 
-            # H_ii = 
-            # H_ij = 
-            # H_jj = 
+            b_i = e.T @ edge.information @ A
 
-            # (TODO )add the terms to H matrix and b
+            b_j = e.T @ edge.information @ B
 
+            H_ii = A.T @ edge.information @ A
+            H_ij = A.T @ edge.information @ B
+            H_ji = B.T @ edge.information @ A
+            H_jj = B.T @ edge.information @ B
+
+            # (TODO) add the terms to H matrix and b
+            H[fromIdx:fromIdx + 2, fromIdx:fromIdx + 2] += H_ii
+            H[fromIdx:fromIdx + 2, toIdx:toIdx + 2] += H_ij
+            H[toIdx:toIdx + 2, fromIdx:fromIdx + 2] += H_ji
+            H[toIdx:toIdx + 2, toIdx:toIdx + 2] += H_jj
+
+            b[fromIdx:fromIdx+2] += b_i
+            b[toIdx:toIdx+2] += b_j
 
     # solve system
     dx = np.linalg.solve(H, b)
-    
+
     return dx
 
 
 def linearize_pose_pose_constraint(x1, x2, z):
     """Compute the error and the Jacobian for pose-pose constraint
-    
+
     Parameters
     ----------
     x1 : 3x1 vector
@@ -370,7 +391,7 @@ def linearize_pose_pose_constraint(x1, x2, z):
          (x,y,theta) of the second robot pose
     z :  3x1 vector
          (x,y,theta) of the measurement
-    
+
     Returns
     -------
     e  : 3x1
@@ -381,24 +402,39 @@ def linearize_pose_pose_constraint(x1, x2, z):
          Jacobian wrt x2
     """
 
-    R_ij = v2t(z)[:2,:2]
-    t_ij = v2t(z)[:2,2]
-    R_i = v2t(x1)[:2,:2]
-    theta = atan2(R_i[1:0],R_i[1:1])
-    del_R_i = np.array([[-sin(theta),cos(theta)],[-cos(theta),-sin(theta)]])
-    t_i = v2t(x1)[:2,2]
-    t_j = v2t(x2)[:2,2]
+    R_ij = v2t(z)[:2, :2]
+    t_ij = v2t(z)[:2, 2].reshape(2, 1)
+    theta_ij = atan2(R_ij[1, 0], R_ij[1, 1])
 
-    A = np.array([[-(R_ij.T @ R_i.T), R_ij.T @ del_R_i @(t_j-t_i)],[0, -1]])
-    B = np.array([[R_ij.T@R_i.T, 0], [0, 1]])
-    e = np.array([R_ij.T@(R_i.T @ (t_j - t_i) -t_ij), theta_j-theta_i-theta_ij]).T
+    R_i = v2t(x1)[:2, :2]
+    theta_i = atan2(R_i[1, 0], R_i[1, 1])
+    del_R_i = np.array([[-sin(theta_i), cos(theta_i)],
+                       [-cos(theta_i), -sin(theta_i)]])
+    t_i = v2t(x1)[:2, 2].reshape(2, 1)
+    t_j = v2t(x2)[:2, 2].reshape(2, 1)
+    R_j = v2t(x2)[:2, :2]
+    theta_j = atan2(R_j[1, 0], R_j[1, 1])
+
+    A_11 = -(R_ij.T @ R_i.T)
+    A_12 = R_ij.T @ del_R_i @ (t_j-t_i)
+    A_21_22 = np.array([0, 0, -1]).reshape(1, 3)
+    A = np.vstack((np.hstack((A_11, A_12)), A_21_22))
+
+    B_11 = R_ij.T@R_i.T
+    B_12 = np.zeros([2, 1])
+    B_21_22 = np.array([0, 0, 1]).reshape(1, 3)
+    B = np.vstack((np.hstack((B_11, B_12)), B_21_22))
+
+    e_11 = R_ij.T@(R_i.T @ (t_j - t_i) - t_ij)
+    e_12 = np.array([theta_j-theta_i-theta_ij])
+    e = np.vstack((e_11, e_12))
 
     return e, A, B
 
 
 def linearize_pose_landmark_constraint(x, l, z):
     """Compute the error and the Jacobian for pose-landmark constraint
-    
+
     Parameters
     ----------
     x : 3x1 vector
@@ -407,7 +443,7 @@ def linearize_pose_landmark_constraint(x, l, z):
         (x,y) of the landmark
     z : 2x1 vector
         (x,y) of the measurement
-    
+
     Returns
     -------
     e : 2x1 vector
@@ -416,6 +452,19 @@ def linearize_pose_landmark_constraint(x, l, z):
     B : 2x2 Jacobian wrt l
     """
 
+    R_i = v2t(x)[:2, :2]
+    t_i = v2t(x)[:2, 2]
+    theta_i = atan2(R_i[1, 0], R_i[1, 1])
 
+    del_R_i = np.array([[-sin(theta_i), cos(theta_i)],
+                       [-cos(theta_i), -sin(theta_i)]])
+
+    A_11 = -R_i.T
+    A_12 = del_R_i@(np.expand_dims(l, axis=1)-t_i)
+    A = np.hstack((A_11, A_12))
+
+    B = R_i.T
+
+    e = np.dot(R_i.T, l - t_i) - z
 
     return e, A, B
