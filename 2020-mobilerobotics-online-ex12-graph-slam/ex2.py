@@ -15,7 +15,7 @@ class Graph:
 
 
 def read_graph_g2o(filename):
-    """ This function reads the g2o text file as the graph class 
+    """ This function reads the g2o text file as the graph class
 
     Parameters
     ----------
@@ -24,7 +24,7 @@ def read_graph_g2o(filename):
 
     Returns
     -------
-    graph: Graph contaning information for SLAM 
+    graph: Graph contaning information for SLAM
 
     """
     Edge = namedtuple(
@@ -91,7 +91,7 @@ def read_graph_g2o(filename):
 
 
 def v2t(pose):
-    """This function converts SE2 pose from a vector to transformation  
+    """This function converts SE2 pose from a vector to transformation
 
     Parameters
     ----------
@@ -110,7 +110,7 @@ def v2t(pose):
 
 
 def t2v(T):
-    """This function converts SE2 transformation to vector for  
+    """This function converts SE2 transformation to vector for
 
     Parameters
     ----------
@@ -212,7 +212,7 @@ def run_graph_slam(g, numIterations):
 
 
 def compute_global_error(g):
-    """ This function computes the total error for the graph. 
+    """ This function computes the total error for the graph.
 
     Parameters
     ----------
@@ -272,7 +272,7 @@ def compute_global_error(g):
 
 def linearize_and_solve(g):
     """ This function solves the least-squares problem for one iteration
-        by linearizing the constraints 
+        by linearizing the constraints
 
     Parameters
     ----------
@@ -280,13 +280,14 @@ def linearize_and_solve(g):
 
     Returns
     -------
-    dx : Nx1 vector 
+    dx : Nx1 vector
          change in the solution for the unknowns x
     """
 
     # initialize the sparse H and the vector b
     H = np.zeros((len(g.x), len(g.x)))
     b = np.zeros(len(g.x))
+    b = np.expand_dims(b, axis=1)
 
     # set flag to fix gauge
     needToAddPrior = True
@@ -314,9 +315,9 @@ def linearize_and_solve(g):
 
             # (TODO) compute the terms
 
-            b_i = e.T @ edge.information @ A
+            b_i = (e.T @ edge.information @ A).reshape(3, 1)
 
-            b_j = e.T @ edge.information @ B
+            b_j = (e.T @ edge.information @ B).reshape(3, 1)
 
             H_ii = A.T @ edge.information @ A
             H_ij = A.T @ edge.information @ B
@@ -365,13 +366,16 @@ def linearize_and_solve(g):
             H_ji = B.T @ edge.information @ A
             H_jj = B.T @ edge.information @ B
 
+            print(np.shape(H[fromIdx:fromIdx + 3,
+                  fromIdx:fromIdx + 3]), np.shape(H_ii))
+
             # (TODO) add the terms to H matrix and b
-            H[fromIdx:fromIdx + 2, fromIdx:fromIdx + 2] += H_ii
-            H[fromIdx:fromIdx + 2, toIdx:toIdx + 2] += H_ij
-            H[toIdx:toIdx + 2, fromIdx:fromIdx + 2] += H_ji
+            H[fromIdx:fromIdx + 3, fromIdx:fromIdx + 3] += H_ii
+            H[fromIdx:fromIdx + 3, toIdx:toIdx + 2] += H_ij
+            H[toIdx:toIdx + 2, fromIdx:fromIdx + 3] += H_ji
             H[toIdx:toIdx + 2, toIdx:toIdx + 2] += H_jj
 
-            b[fromIdx:fromIdx+2] += b_i
+            b[fromIdx:fromIdx+3] += b_i
             b[toIdx:toIdx+2] += b_j
 
     # solve system
@@ -460,8 +464,10 @@ def linearize_pose_landmark_constraint(x, l, z):
                        [-cos(theta_i), -sin(theta_i)]])
 
     A_11 = -R_i.T
-    A_12 = del_R_i@(np.expand_dims(l, axis=1)-t_i)
+    A_12 = del_R_i@(np.expand_dims(l, axis=1) - np.expand_dims(t_i, axis=1))
     A = np.hstack((A_11, A_12))
+    # print(np.shape(np.expand_dims(l, axis=1)),  np.shape(
+    #     np.expand_dims(t_i, axis=1)), np.shape(A_12))
 
     B = R_i.T
 
