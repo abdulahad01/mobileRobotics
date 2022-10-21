@@ -7,6 +7,9 @@ from math import sin, cos
 import numpy as np
 from collections import namedtuple
 import matplotlib.pyplot as plt
+from scipy.sparse.linalg import spsolve
+from scipy.sparse import csr_matrix
+import gif
 
 
 # Helper functions to get started
@@ -133,6 +136,26 @@ def t2v(T):
     return v
 
 
+@gif.frame
+def get_frame(g):
+    # initialize figure
+    plt.figure(1)
+    plt.clf()
+
+    # get a list of all poses and landmarks
+    poses, landmarks = get_poses_landmarks(g)
+
+    # plot robot poses
+    if len(poses) > 0:
+        poses = np.stack(poses, axis=0)
+        plt.plot(poses[:, 0], poses[:, 1], 'b.')
+
+    # plot landmarks
+    if len(landmarks) > 0:
+        landmarks = np.stack(landmarks, axis=0)
+        plt.plot(landmarks[:, 0], landmarks[:, 1], 'r*')
+
+
 def plot_graph(g):
 
     # initialize figure
@@ -145,7 +168,7 @@ def plot_graph(g):
     # plot robot poses
     if len(poses) > 0:
         poses = np.stack(poses, axis=0)
-        plt.plot(poses[:, 0], poses[:, 1], 'bo')
+        plt.plot(poses[:, 0], poses[:, 1], 'b.')
 
     # plot landmarks
     if len(landmarks) > 0:
@@ -177,8 +200,6 @@ def plot_graph(g):
     plt.draw()
     plt.pause(1)
 
-    return
-
 
 def get_poses_landmarks(g):
     poses = []
@@ -199,8 +220,9 @@ def get_poses_landmarks(g):
 
 
 def run_graph_slam(g, numIterations):
-    tolerance = 1e-5
+    tolerance = 10e-4
     dX_ls = []
+    frames = []
 
     # perform optimization
     for i in range(numIterations):
@@ -210,17 +232,26 @@ def run_graph_slam(g, numIterations):
         # apply the solution to the state vector g.x
         g.x += dX
 
+        # create frame
+        frames.append(get_frame(g))
+
         # compute and print global error
+        err = compute_global_error(g)
+        print("Global error for step {} : {}\n".format(i, err))
+
         norm_dX = np.linalg.norm(dX)
-        print("|dX| for step {} : {}\n".format(i, norm_dX))
         dX_ls.append(norm_dX)
 
         # terminate procedure if change is less than 1e-5
         if (i > 1) and (np.abs(dX_ls[i] - dX_ls[i - 1]) < tolerance):
-            print("Tolerance level reached")
+            print("Converged")
             break
 
     # plot graph
+    print("final error {} \n".format(err))
+    gif.save(frames, str(err)+".gif",
+             duration=5, unit="s",
+             between="startend")
     plot_graph(g)
 
 
@@ -258,7 +289,8 @@ def compute_global_error(g):
             Z_inverse = np.linalg.inv(v2t(z12))
             X1_inverse = np.linalg.inv(v2t(x1))
             X2 = v2t(x2)
-            Fx += np.linalg.norm(t2v(Z_inverse @ (X1_inverse @ X2)))
+            err_p = t2v(Z_inverse @ (X1_inverse @ X2))
+            Fx += np.linalg.norm(err_p.T @ info12 @ err_p)
 
         # pose-pose constraint
         elif edge.Type == 'L':
@@ -277,9 +309,8 @@ def compute_global_error(g):
 
             # (TODO) compute the error due to this edge
             X = v2t(x)[:2, :2]
-            Fx += np.linalg.norm((np.linalg.inv(X) @ np.expand_dims(l,
-                                 axis=1)) - np.expand_dims(z, axis=1))
-
+            err_p_l = (np.linalg.inv(X) @ l.reshape(2, 1)) - z.reshape(2, 1)
+            Fx += np.linalg.norm(err_p_l.T @ info12 @ err_p_l)
     return Fx
 
 
@@ -319,8 +350,8 @@ def linearize_and_solve(g):
             toIdx = g.lut[edge.toNode]
 
             # get node state for the current edge
-            x_i = g.x[fromIdx:fromIdx + 3]
-            x_j = g.x[toIdx:toIdx + 3]
+            x_i = g.x[fromIdx:fromIdx + 3]  # first pose
+            x_j = g.x[toIdx:toIdx + 3]  # second pose
 
             # (TODO) compute the error and the Jacobians
             e, A, B = linearize_pose_pose_constraint(
@@ -328,9 +359,9 @@ def linearize_and_solve(g):
 
             # (TODO) compute the terms
 
-            b_i = (A.T @ edge.information @ e).reshape(3, 1)
+            b_i = -(e.T @ edge.information @ A).T.reshape(3, 1)
 
-            b_j = (B.T @ edge.information @ e).reshape(3, 1)
+            b_j = -(e.T @ edge.information @ B).T.reshape(3, 1)
 
             H_ii = A.T @ edge.information @ A
             H_ij = A.T @ edge.information @ B
@@ -371,9 +402,9 @@ def linearize_and_solve(g):
                 x, l, edge.measurement)
 
             # (TODO) compute the terms
-            b_i = (A.T @ edge.information @ e).reshape(3, 1)
+            b_i = -(e.T @ edge.information @ A).T.reshape(3, 1)
 
-            b_j = (B.T @ edge.information @ e).reshape(2, 1)
+            b_j = -(e.T @ edge.information @ B).T.reshape(2, 1)
 
             H_ii = A.T @ edge.information @ A
             H_ij = A.T @ edge.information @ B
@@ -390,7 +421,10 @@ def linearize_and_solve(g):
             b[toIdx:toIdx+2] += b_j
 
     # solve system
-    dx = np.linalg.solve(H, -b)
+    dx = np.linalg.solve(H, b)
+    H_sparse = csr_matrix(H)
+    # Solve sparse system
+    dx = spsolve(H_sparse, b)
 
     # To align with graph.x.shape
     dx = np.squeeze(dx)
@@ -422,16 +456,13 @@ def linearize_pose_pose_constraint(x1, x2, z):
     # translation
     t_i = x1[:2].reshape(2, 1)
     t_j = x2[:2].reshape(2, 1)
-    t_ij = z[:2].reshape(2, 1)
 
     # Rotation Matrix
     R_i = v2t(x1)[:2, :2]
     R_ij = v2t(z)[:2, :2]
 
     # Angle
-    theta_ij = z[2]
     theta_i = x1[2]
-    theta_j = x2[2]
 
     del_R_i_T = np.array([[-sin(theta_i), cos(theta_i)],
                           [-cos(theta_i), -sin(theta_i)]])
@@ -446,9 +477,10 @@ def linearize_pose_pose_constraint(x1, x2, z):
     B_21_22 = np.array([0, 0, 1])
     B = np.vstack((np.hstack((B_11, B_12)), B_21_22))
 
-    e_11 = R_ij.T@(R_i.T @ (t_j - t_i) - t_ij)
-    e_21 = np.array([theta_j-theta_i-theta_ij])
-    e = np.vstack((e_11, e_21))
+    Z_inv = np.linalg.inv(v2t(z))
+    X1_inv = np.linalg.inv(v2t(x1))
+    X2 = v2t(x2)
+    e = t2v(Z_inv @ X1_inv @ X2)
 
     return e, A, B
 
