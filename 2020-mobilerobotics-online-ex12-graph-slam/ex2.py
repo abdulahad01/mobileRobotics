@@ -1,6 +1,9 @@
-from math import atan2, sin, cos
-import math
-from socket import fromfd
+"""
+Completed by Abdul Ahad
+https://github.com/abdulahad01/mobileRobotics
+"""
+
+from math import sin, cos
 import numpy as np
 from collections import namedtuple
 import matplotlib.pyplot as plt
@@ -81,7 +84,7 @@ def read_graph_g2o(filename):
         lut.update({nodeId: offset})
         offset = offset + len(nodes[nodeId])
         x.append(nodes[nodeId])
-    x = np.concatenate(x, axis=0)
+    x = np.concatenate(x, axis=0).astype("float64")
 
     # collect nodes, edges and lookup in graph structure
     graph = Graph(x, nodes, edges, lut)
@@ -196,8 +199,8 @@ def get_poses_landmarks(g):
 
 
 def run_graph_slam(g, numIterations):
-    tolerance = 1e-4
-    norm_dX_all = []
+    tolerance = 1e-5
+    dX_ls = []
 
     # perform optimization
     for i in range(numIterations):
@@ -205,22 +208,20 @@ def run_graph_slam(g, numIterations):
         dX = linearize_and_solve(g)
 
         # apply the solution to the state vector g.x
-        g.x = np.expand_dims(g.x, axis=1)
         g.x += dX
-
-        # plot graph
-        plot_graph(g)
 
         # compute and print global error
         norm_dX = np.linalg.norm(dX)
-        print(f"|dX| for step {i} : {norm_dX}\n")
-        norm_dX_all.append(norm_dX)
+        print("|dX| for step {} : {}\n".format(i, norm_dX))
+        dX_ls.append(norm_dX)
 
-        # terminate procedure if change is less than 10e-4
-        if i >= 1 and np.abs(norm_dX_all[i] - norm_dX_all[i - 1]) < tolerance:
+        # terminate procedure if change is less than 1e-5
+        if (i > 1) and (np.abs(dX_ls[i] - dX_ls[i - 1]) < tolerance):
+            print("Tolerance level reached")
             break
 
-    return
+    # plot graph
+    plot_graph(g)
 
 
 def compute_global_error(g):
@@ -254,10 +255,10 @@ def compute_global_error(g):
             info12 = edge.information
 
             # (TODO) compute the error due to this edge
-            Z = v2t(z12)
+            Z_inverse = np.linalg.inv(v2t(z12))
             X1_inverse = np.linalg.inv(v2t(x1))
             X2 = v2t(x2)
-            Fx += np.linalg.norm(t2v(np.linalg.inv(Z) @ (X1_inverse @ X2)))
+            Fx += np.linalg.norm(t2v(Z_inverse @ (X1_inverse @ X2)))
 
         # pose-pose constraint
         elif edge.Type == 'L':
@@ -327,16 +328,17 @@ def linearize_and_solve(g):
 
             # (TODO) compute the terms
 
-            b_i = (e.T @ edge.information @ A).reshape(3, 1)
+            b_i = (A.T @ edge.information @ e).reshape(3, 1)
 
-            b_j = (e.T @ edge.information @ B).reshape(3, 1)
+            b_j = (B.T @ edge.information @ e).reshape(3, 1)
 
             H_ii = A.T @ edge.information @ A
             H_ij = A.T @ edge.information @ B
-            H_ji = B.T @ edge.information @ A
+            H_ji = H_ij.T
             H_jj = B.T @ edge.information @ B
 
             # (TODO) add the terms to H matrix and b
+
             H[fromIdx:fromIdx + 3, fromIdx:fromIdx + 3] += H_ii
             H[fromIdx:fromIdx + 3, toIdx:toIdx + 3] += H_ij
             H[toIdx:toIdx + 3, fromIdx:fromIdx + 3] += H_ji
@@ -369,16 +371,14 @@ def linearize_and_solve(g):
                 x, l, edge.measurement)
 
             # (TODO) compute the terms
-            b_i = (e.T @ edge.information @ A).reshape(3, 1)
+            b_i = (A.T @ edge.information @ e).reshape(3, 1)
 
-            b_j = (e.T @ edge.information @ B).reshape(2, 1)
+            b_j = (B.T @ edge.information @ e).reshape(2, 1)
 
             H_ii = A.T @ edge.information @ A
             H_ij = A.T @ edge.information @ B
-            H_ji = B.T @ edge.information @ A
+            H_ji = H_ij.T
             H_jj = B.T @ edge.information @ B
-
-            # print(np.shape(b[fromIdx:fromIdx+3]), np.shape(b_i))
 
             # (TODO) add the terms to H matrix and b
             H[fromIdx:fromIdx + 3, fromIdx:fromIdx + 3] += H_ii
@@ -390,7 +390,10 @@ def linearize_and_solve(g):
             b[toIdx:toIdx+2] += b_j
 
     # solve system
-    dx = np.linalg.solve(H, b)
+    dx = np.linalg.solve(H, -b)
+
+    # To align with graph.x.shape
+    dx = np.squeeze(dx)
 
     return dx
 
@@ -416,33 +419,36 @@ def linearize_pose_pose_constraint(x1, x2, z):
     B  : 3x3
          Jacobian wrt x2
     """
+    # translation
+    t_i = x1[:2].reshape(2, 1)
+    t_j = x2[:2].reshape(2, 1)
+    t_ij = z[:2].reshape(2, 1)
 
-    R_ij = v2t(z)[:2, :2]
-    t_ij = v2t(z)[:2, 2].reshape(2, 1)
-    theta_ij = atan2(R_ij[1, 0], R_ij[1, 1])
-
+    # Rotation Matrix
     R_i = v2t(x1)[:2, :2]
-    theta_i = atan2(R_i[1, 0], R_i[1, 1])
-    del_R_i = np.array([[-sin(theta_i), cos(theta_i)],
-                       [-cos(theta_i), -sin(theta_i)]])
-    t_i = v2t(x1)[:2, 2].reshape(2, 1)
-    t_j = v2t(x2)[:2, 2].reshape(2, 1)
-    R_j = v2t(x2)[:2, :2]
-    theta_j = atan2(R_j[1, 0], R_j[1, 1])
+    R_ij = v2t(z)[:2, :2]
 
-    A_11 = -(R_ij.T @ R_i.T)
-    A_12 = R_ij.T @ del_R_i @ (t_j-t_i)
-    A_21_22 = np.array([0, 0, -1]).reshape(1, 3)
+    # Angle
+    theta_ij = z[2]
+    theta_i = x1[2]
+    theta_j = x2[2]
+
+    del_R_i_T = np.array([[-sin(theta_i), cos(theta_i)],
+                          [-cos(theta_i), -sin(theta_i)]])
+
+    A_11 = (-R_ij.T @ R_i.T)
+    A_12 = R_ij.T @ del_R_i_T @ (t_j-t_i)
+    A_21_22 = np.array([0, 0, -1])
     A = np.vstack((np.hstack((A_11, A_12)), A_21_22))
 
-    B_11 = R_ij.T@R_i.T
-    B_12 = np.zeros([2, 1])
-    B_21_22 = np.array([0, 0, 1]).reshape(1, 3)
+    B_11 = R_ij.T @ R_i.T
+    B_12 = np.zeros([2, 1]).astype('float64')
+    B_21_22 = np.array([0, 0, 1])
     B = np.vstack((np.hstack((B_11, B_12)), B_21_22))
 
     e_11 = R_ij.T@(R_i.T @ (t_j - t_i) - t_ij)
-    e_12 = np.array([theta_j-theta_i-theta_ij])
-    e = np.vstack((e_11, e_12))
+    e_21 = np.array([theta_j-theta_i-theta_ij])
+    e = np.vstack((e_11, e_21))
 
     return e, A, B
 
@@ -468,20 +474,21 @@ def linearize_pose_landmark_constraint(x, l, z):
     """
 
     R_i = v2t(x)[:2, :2]
-    t_i = v2t(x)[:2, 2]
-    theta_i = atan2(R_i[1, 0], R_i[1, 1])
+    t_i = x[:2].reshape(2, 1)
+    theta_i = x[2]
 
-    del_R_i = np.array([[-sin(theta_i), cos(theta_i)],
-                       [-cos(theta_i), -sin(theta_i)]])
+    del_R_i_T = np.array([[-sin(theta_i), cos(theta_i)],
+                          [-cos(theta_i), -sin(theta_i)]])
 
+    # A
     A_11 = -R_i.T
-    A_12 = del_R_i@(np.expand_dims(l, axis=1) - np.expand_dims(t_i, axis=1))
+    A_12 = del_R_i_T@(l.reshape(2, 1) - t_i)
     A = np.hstack((A_11, A_12))
-    # print(np.shape(np.expand_dims(l, axis=1)),  np.shape(
-    #     np.expand_dims(t_i, axis=1)), np.shape(A_12))
 
+    # B
     B = R_i.T
 
-    e = np.dot(R_i.T, l - t_i) - z
+    # e
+    e = R_i.T @ (l.reshape(2, 1) - t_i) - z.reshape(2, 1)
 
     return e, A, B
