@@ -72,5 +72,12 @@ Assignments and related course material completed by me as part of the 'Online T
    ```
 
    In the given assignment, KDtree algorithm was used to find correspondence between points.
-   ![Input](img/icp_input.png?raw=true "Input")   
-   ![Output](img/icp_output.png?raw=true "Output") 
+![ICP](img/icp.gif "ICP")
+  
+
+
+1. **Graph SLAM** : SLAM or simulataneous localization and mapping is one of the important and most researched areas in robotics. The SLAM problem is inherently complex because we are trying to map the surrounding while simulateously localizing itself withing the said map.  
+Traditonal approaches like EKF based SLAM treated it as an estimation problem while modern approach as graph based SLAM treat it as an optimization problem.  
+In graph SLAM based approach the poses of the robot are modeled as the nodes and the edges are constraints between these nodes, either odometry constraints or observation constraints. Thus the SLAM problem essentially seeks to optimize these constraints so as to get the optimal graph. This solves the full SLAM problem.  
+
+![SLAM on DLR dataset](img/dlr.gif "DLR dataset")
