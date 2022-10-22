@@ -1,5 +1,10 @@
+"""
+Completed by Abdul Ahad
+https://github.com/abdulahad01/mobileRobotics
+"""
+
 # -*- coding: utf-8 -*-
-from math import atan2, sqrt,sin,cos
+from math import atan2, sqrt, sin, cos
 import matplotlib.pyplot as plt
 import matplotlib.transforms as transforms
 import numpy as np
@@ -57,34 +62,37 @@ def wrapToPi(theta):
         theta = theta - 2 * np.pi
     return theta
 
+
 def inverse_motion_model(u):
     # print(u)
     rot1 = wrapToPi(atan2((u[1][1]-u[0][1]), (u[1][0]-u[0][0])) - u[0][2])
     trans = sqrt(((u[1][0]-u[0][0])**2) + ((u[1][1]-u[0][1])**2))
     rot2 = wrapToPi(u[1][2] - u[0][2] - rot1)
     # print(rot1,trans,rot2)
-    return rot1,trans,rot2
+    return rot1, trans, rot2
 
-def ekf_predict(x_pred,P_pred,u,M = np.zeros(3)):
-        x_pred = x_pred.reshape(3,1)
-        rot1,trans,rot2 = inverse_motion_model([u[0],u[1]])
-        # predicted mean is the value of process model at linearization point
-        theta = x_pred[2]
-        G = np.array([[1, 0, -trans*(sin(theta +rot1))],
-                      [0, 1, trans*cos(theta+rot1)],
-                      [0, 0, 1]])
-        # print(G)
-        V = np.array([[-trans*sin(theta+rot1), cos(theta+rot1), 0],
-                     [trans*cos(theta+rot1), sin(theta+rot1), 0],
-                     [1, 0, 1]])
-        x_pred = x_pred + np.array([[trans*cos(theta+rot1)],
-                                    [trans*sin(theta+rot1)],
-                                    [rot2+rot1]])
-        # covariance of prediction is GPG^T + VMV^T, where G is the jacobian of process at linearization point
-        P_pred = np.dot(np.dot(G,P_pred),G.T) + np.dot(np.dot(V,M),V.T) 
-        return x_pred,P_pred
 
-def ekf_correct(x,P,z,map,Q):
+def ekf_predict(x_pred, P_pred, u, M=np.zeros(3)):
+    x_pred = x_pred.reshape(3, 1)
+    rot1, trans, rot2 = inverse_motion_model([u[0], u[1]])
+    # predicted mean is the value of process model at linearization point
+    theta = x_pred[2]
+    G = np.array([[1, 0, -trans*(sin(theta + rot1))],
+                  [0, 1, trans*cos(theta+rot1)],
+                  [0, 0, 1]])
+    # print(G)
+    V = np.array([[-trans*sin(theta+rot1), cos(theta+rot1), 0],
+                 [trans*cos(theta+rot1), sin(theta+rot1), 0],
+                 [1, 0, 1]])
+    x_pred = x_pred + np.array([[trans*cos(theta+rot1)],
+                                [trans*sin(theta+rot1)],
+                                [rot2+rot1]])
+    # covariance of prediction is GPG^T + VMV^T, where G is the jacobian of process at linearization point
+    P_pred = np.dot(np.dot(G, P_pred), G.T) + np.dot(np.dot(V, M), V.T)
+    return x_pred, P_pred
+
+
+def ekf_correct(x, P, z, map, Q):
     # Calculate z_estimate from map readings and pos of robot
     for i in range(z.shape[1]):
         theta = x[2][0]
@@ -93,28 +101,28 @@ def ekf_correct(x,P,z,map,Q):
         q = (x[0][0] - m[0])**2 + (x[1][0] - m[1])**2
         z_estimate = np.array([
             [sqrt(q)],
-            [wrapToPi(atan2( (m[1]-x[1][0]), (m[0] -x[0][0])) - theta)]
-            ],dtype=np.float)
+            [wrapToPi(atan2((m[1]-x[1][0]), (m[0] - x[0][0])) - theta)]
+        ], dtype=np.float)
 
-        # Calculate y 
-        y= (np.array(z[:2,i]).reshape(2,1) - z_estimate)
-        H =np.array([
-            [-(m[0]-x[0][0])/sqrt(q),  -(m[1] -x[1][0])/sqrt(q), 0],
-            [ (m[1] -x[1][0])/q, -(m[0]-x[0][0])/q, -1]
-        ],dtype=np.float)
+        # Calculate y
+        y = (np.array(z[:2, i]).reshape(2, 1) - z_estimate)
+        H = np.array([
+            [-(m[0]-x[0][0])/sqrt(q),  -(m[1] - x[1][0])/sqrt(q), 0],
+            [(m[1] - x[1][0])/q, -(m[0]-x[0][0])/q, -1]
+        ], dtype=np.float)
         # print(H)
 
         # Calculate S = HPH^T + R
-        S = np.dot(H,np.dot(P,H.T)) + Q
-        # print(S, "\n", S.shape) 
+        S = np.dot(H, np.dot(P, H.T)) + Q
+        # print(S, "\n", S.shape)
 
         # Calculate Kalman gain K = PH^TS^-1
-        K = np.dot(P,np.dot(H.T,np.linalg.inv(S)))
-        # print(K, "\n", K.shape) 
+        K = np.dot(P, np.dot(H.T, np.linalg.inv(S)))
+        # print(K, "\n", K.shape)
         # x_est = x-Ky
-        x = x + np.dot(K,y)
+        x = x + np.dot(K, y)
         x[2][0] = wrapToPi(x[2][0])
         # P_est = P_est -KSK^T
-        P = P - np.dot(K,np.dot(S,K.T))
+        P = P - np.dot(K, np.dot(S, K.T))
 
-    return x,P
+    return x, P
