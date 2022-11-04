@@ -24,7 +24,11 @@ Assignemnts and related material from [Online Training: Mobile Robotics](https:/
    In the given [excercise](EKF%20Localization/ex6.ipynb) the odometry and range measurements from a differential drive robot was given and the task was to localize the robot in a feature based map with known correspondence.    
    ![Final Trajectory after EKF Localization](img/ekf.png?raw=true "Final Trajectory")   
 
-7. **Path planning** The path planning problem basically estimates a path from a given node to a goal node in a given mapped terrain. The path planning algorithms are of two types:  
+7. **Monte Carlo Localization** algorithm attempts to solve the localization problem using the particle filter approach.  The particle filter approach uses a set of particles to represent the given state space. And then we perform a set of weighing and resampling steps over the entire set of particles. By assigning higher weights and resampling based on these weights we get a high concentration of particles at the configuration that has the highest probability.  
+   In the given [excercise](Monte%20Carlo%20Localization/ex7.ipynb) the odometry data from a differential drive robot was given and the task was to localize the robot in the given map.  
+![Monte Carlo](img/mcl_sample.gif "MIT-CSAIL")
+
+8. **Path planning** The path planning problem basically estimates a path from a given node to a goal node in a given mapped terrain. The path planning algorithms are of two types:  
       1. Informed :  
    In informed search the algorithm has some information about the cost to the goal node, usually in the form of heruristics.  
    eg. A*, Greedy search etc.
@@ -65,7 +69,7 @@ Assignemnts and related material from [Online Training: Mobile Robotics](https:/
    ```
    ![A* path planner](img/astar.png?raw=true "A* planner")  
 
-8. **Iterative Closest Point** : The point cloud data from Lidar or depth scans is not aligned. So for SLAM and other applications we need to match the cordinate frames of corresponding clouds. This can be done for both cases, known correspondeces and unknown correspondence between points.  
+9. **Iterative Closest Point** : The point cloud data from Lidar or depth scans is not aligned. So for SLAM and other applications we need to match the cordinate frames of corresponding clouds. This can be done for both cases, known correspondeces and unknown correspondence between points.  
    The algorithm for ICP is fairly straight forward.
    ```
    1. Define an initial guess
@@ -81,8 +85,7 @@ Assignemnts and related material from [Online Training: Mobile Robotics](https:/
   
 
 
-1. **Graph SLAM** : SLAM or simulataneous localization and mapping is one of the important and most researched areas in robotics. The SLAM problem is inherently complex because we are trying to map the surrounding while simulateously localizing itself withing the said map.  
+10. **Graph SLAM** : SLAM or simulataneous localization and mapping is one of the important and most researched areas in robotics. The SLAM problem is inherently complex because we are trying to map the surrounding while simulateously localizing itself withing the said map.  
 Traditonal approaches like EKF based SLAM treated it as an estimation problem while modern approach as graph based SLAM treat it as an optimization problem.  
 In graph SLAM based approach the poses of the robot are modeled as the nodes and the edges are constraints between these nodes, either odometry constraints or observation constraints. Thus the SLAM problem essentially seeks to optimize these constraints so as to get the optimal graph. This solves the full SLAM problem.  
-
 ![SLAM on DLR dataset](img/dlr.gif "DLR dataset")
